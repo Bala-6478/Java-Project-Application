@@ -4,8 +4,7 @@
 ### 3. Password instroction giver using GUI
 ### 4. Library GUI In Java
 ### 5. Zip Utility GUI 
-### 6. InterestCalculator
-  
+### 6. InterestCalculator GUI
 
 
 
