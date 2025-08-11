@@ -5,7 +5,7 @@
 ### 4. Library GUI In Java
 ### 5. Zip Utility GUI In Java
 ### 6. InterestCalculator GUI In Java
-### 7. Screenshot App
+### 7. Screenshot App GUI In Java
 
 
 
