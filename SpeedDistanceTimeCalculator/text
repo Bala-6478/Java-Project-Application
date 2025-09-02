@@ -1,0 +1,3 @@
+Compile & Runing commands
+javac SpeedDistanceTimeCalculator.java
+java SpeedDistanceTimeCalculator.java
