@@ -8,7 +8,7 @@ class ZipUtilityGUI extends JFrame {
     private JButton compressButton, decompressButton;
 
     public ZipUtilityGUI() {
-        setTitle("📦 ZIP Utility Tool - SANTHOSH EDITION");
+        setTitle("📦 ZIP Utility Tool");
         setSize(400, 200);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null); // Center screen
