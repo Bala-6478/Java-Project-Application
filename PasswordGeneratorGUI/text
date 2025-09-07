@@ -1,0 +1,4 @@
+Run & compile Command
+
+javac PasswordGeneratorGUI.java
+java PasswordGeneratorGUI.java
