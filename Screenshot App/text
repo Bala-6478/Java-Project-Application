@@ -1,2 +1,4 @@
 Run & Compile Command
 
+javac ScreenshotApp.java
+java ScreenshotApp.java
