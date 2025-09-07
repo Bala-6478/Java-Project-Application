@@ -1,2 +1,4 @@
 Run & Compile command
 
+javac InventoryGUI.java
+java InventoryGUI.java
