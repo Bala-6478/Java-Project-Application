@@ -1,0 +1,4 @@
+Run & Compile command 
+
+javac SnakeGame.java
+java SnakeGame.java
