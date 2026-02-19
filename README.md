@@ -7,7 +7,7 @@
 5. Zip Utility GUI In Java    
 6. InterestCalculator GUI In Java
 7. Screenshot App GUI In Java      
-8. Inventory Management System GUI In Java
+8. Inventory Management System GUI In Java  
 9. AttendanceSystem GUI In Java   
 10. NumberGuessingGame GUI In Java  
 11. Scientific Calculator GUI In Java
