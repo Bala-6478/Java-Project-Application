@@ -1,6 +1,6 @@
 ## Java GUI 
 A Java-based GUI application demonstrating graphical user interface development using Swing or JavaFX.
-----
+-----
 ### Java GUI project Runing Command :
 
 This type java code run use to cmd are vs code use to run this code.
