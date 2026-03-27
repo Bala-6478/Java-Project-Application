@@ -1,5 +1,6 @@
-### Java-Project-Application      
- 
+### java GUI 
+  ~ A Java-based GUI application demonstrating graphical user interface development using Swing or JavaFX.
+### Java-Project-Application  
 1. Password Generator GUI In Java   
 2. Add Vote GUI Cheaker in Java   
 3. Password instroction giver using GUI  
