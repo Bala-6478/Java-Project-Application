@@ -1,4 +1,4 @@
-## Java GUI 
+## Java GUI (Graphical user interface)
 * A Java-based GUI application demonstrating graphical user interface development using Swing or JavaFX.
 -----
 ### Java GUI project Runing Command :
