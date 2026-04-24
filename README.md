@@ -30,7 +30,7 @@ This type java code run use to cmd are vs code use to run this code.
 16. ResumeBuilder GUI In Java
 17. FruitNinjaGame GUI In Java
 18. AdvanceNotepadApp GUI In Java
-19. ImageViewer GUI In Java
+19. AdvanceImageViewer GUI In Java
 20. MultiToolApp GUI In Java
 21. FileExplorerPro GUI In Java
 22. StudentGradeCalculator GUI In Java
