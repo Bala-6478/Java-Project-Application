@@ -2,12 +2,14 @@
 * A Java-based GUI application demonstrating graphical user interface development using Swing or JavaFX.
 *  Enhanced this all Code NEW UPADTE FOR BEST_TEAM !!! NOT OTHER TEAM (2026 UPDATES) ....
 --------
-### Java GUI project Runing Command :
+## Run the Code (Based on File Type)
 
-This type java code run use to cmd are vs code use to run this code.
+The command to run the code depends on the programming language or file type of the project: 
+Java (.java):
 
-#### * javac PROJECTFILENAME.java
-#### * java PROJECTFILENAME.java
+### Compile it: 
+* javac filename.java
+* java filenmae.java
 --------
 ### JDK Version Check  :
 
