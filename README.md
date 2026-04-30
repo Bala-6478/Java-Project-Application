@@ -2,7 +2,7 @@
 * A Java-based GUI application demonstrating graphical user interface development using Swing or JavaFX.
 *  Enhanced this all Code NEW UPADTE FOR BEST_TEAM !!! NOT OTHER TEAM (2026 UPDATES) ....
 --------
-## Run the Code (Based on File Type)
+## Run the Code 
 
 The command to run the code depends on the programming language or file type of the project: 
 Java (.java):
