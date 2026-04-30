@@ -1,294 +1,426 @@
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.geom.RoundRectangle2D;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 /**
- * Main class for the Snake Game, sets up the main window (JFrame).
+ * Main class for the Snake Game.
+ * Launches the game on the Event Dispatch Thread as required by Swing.
  */
 public class SnakeGame extends JFrame {
 
     public SnakeGame() {
-        // Add the main game panel to the frame
         add(new GamePanel());
-        // Set the title of the window
         setTitle("Snake Game");
-        // Ensure the application exits when the window is closed
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        // Make the window non-resizable
         setResizable(false);
-        // Pack the components of the window snugly
         pack();
-        // Center the window on the screen
         setLocationRelativeTo(null);
-        // Make the window visible
         setVisible(true);
     }
 
     public static void main(String[] args) {
-        // Create a new instance of the game on the Event Dispatch Thread
-        new SnakeGame();
+        SwingUtilities.invokeLater(SnakeGame::new);
     }
 }
 
 /**
- * GamePanel class contains all the core game logic and graphics.
+ * Represents a single point on the game grid.
+ */
+class Point {
+    int x, y;
+    Point(int x, int y) { this.x = x; this.y = y; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof Point)) return false;
+        Point p = (Point) o;
+        return x == p.x && y == p.y;
+    }
+}
+
+/**
+ * Enum for snake direction — eliminates magic char comparisons and
+ * makes reversal checks clean and readable.
+ */
+enum Direction {
+    UP, DOWN, LEFT, RIGHT;
+
+    /** Returns true if moving in this direction would instantly reverse into {@code current}. */
+    boolean isOpposite(Direction current) {
+        return (this == UP   && current == DOWN)
+            || (this == DOWN  && current == UP)
+            || (this == LEFT  && current == RIGHT)
+            || (this == RIGHT && current == LEFT);
+    }
+}
+
+/**
+ * Enum for the overall game state machine.
+ */
+enum GameState { WAITING, RUNNING, PAUSED, GAME_OVER }
+
+/**
+ * GamePanel contains all game logic and rendering.
+ *
+ * Key improvements over original:
+ *  - Bug fix: collision loop used index bodyParts (out-of-bounds); fixed to bodyParts-1.
+ *  - Bug fix: direction change buffered so rapid key presses can't cause self-reversal.
+ *  - Feature: pause support (P key).
+ *  - Feature: persistent high score across restarts.
+ *  - Feature: progressive speed — game gets faster every 5 apples.
+ *  - Feature: grid overlay, rounded snake segments, gradient-style coloring.
+ *  - Code quality: Direction enum replaces magic chars; Point class replaces parallel arrays;
+ *    GameState enum replaces boolean flags; magic numbers extracted to named constants.
  */
 class GamePanel extends JPanel implements ActionListener {
 
-    // --- Game Constants ---
-    static final int SCREEN_WIDTH = 600;
-    static final int SCREEN_HEIGHT = 600;
-    static final int UNIT_SIZE = 25; // Size of each grid unit (and snake body part)
-    static final int GAME_UNITS = (SCREEN_WIDTH * SCREEN_HEIGHT) / (UNIT_SIZE * UNIT_SIZE);
-    static final int DELAY = 75; // The delay for the game timer (controls game speed)
+    // --- Layout constants ---
+    static final int UNIT        = 25;   // pixels per grid cell
+    static final int COLS        = 24;
+    static final int ROWS        = 24;
+    static final int SCREEN_W    = COLS * UNIT;
+    static final int SCREEN_H    = ROWS * UNIT;
 
-    // --- Game State Variables ---
-    // Arrays to hold the x and y coordinates of the snake's body parts
-    final int x[] = new int[GAME_UNITS];
-    final int y[] = new int[GAME_UNITS];
-    int bodyParts = 6; // Initial length of the snake
-    int applesEaten;
-    int appleX; // x-coordinate of the apple
-    int appleY; // y-coordinate of the apple
-    char direction = 'R'; // Initial direction: 'R' for Right, 'L' for Left, 'U' for Up, 'D' for Down
-    boolean running = false;
-    Timer timer;
-    Random random;
+    // --- Timing constants ---
+    static final int BASE_DELAY  = 120;  // ms per tick at level 1
+    static final int MIN_DELAY   = 50;   // fastest the game can go
+    static final int SPEED_STEP  = 10;   // ms shaved off per level
+    static final int APPLES_PER_LEVEL = 5;
 
-    /**
-     * Constructor for the GamePanel.
-     */
+    // --- Colours ---
+    static final Color COL_BG         = new Color(15, 20, 15);
+    static final Color COL_GRID       = new Color(25, 35, 25);
+    static final Color COL_HEAD       = new Color(100, 255, 100);
+    static final Color COL_BODY_LIGHT = new Color(50, 200, 50);
+    static final Color COL_BODY_DARK  = new Color(20, 120, 20);
+    static final Color COL_APPLE      = new Color(220, 50, 50);
+    static final Color COL_APPLE_STEM = new Color(120, 80, 40);
+    static final Color COL_HUD        = new Color(160, 255, 160);
+    static final Color COL_OVERLAY_BG = new Color(0, 0, 0, 160);
+
+    // --- Game state ---
+    private final List<Point> snake = new ArrayList<>();
+    private Direction direction;
+    private Direction bufferedDir;   // next direction, applied at tick start
+    private Point apple;
+    private int score;
+    private int highScore;
+    private GameState state;
+    private Timer timer;
+    private final Random random = new Random();
+
     GamePanel() {
-        random = new Random();
-        this.setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
-        this.setBackground(Color.black);
-        this.setFocusable(true);
-        this.addKeyListener(new MyKeyAdapter());
-        startGame();
+        setPreferredSize(new Dimension(SCREEN_W, SCREEN_H));
+        setBackground(COL_BG);
+        setFocusable(true);
+        addKeyListener(new MyKeyAdapter());
+        initGame();
     }
 
-    /**
-     * Initializes or resets the game state.
-     */
-    public void startGame() {
-        // Set initial snake length, score, and direction
-        bodyParts = 6;
-        applesEaten = 0;
-        direction = 'R';
-        // Position the initial snake body parts in a line near the center
-        for (int i = 0; i < bodyParts; i++) {
-            x[i] = SCREEN_WIDTH / 2;
-            y[i] = SCREEN_HEIGHT / 2;
+    // -------------------------------------------------------------------------
+    // Game lifecycle
+    // -------------------------------------------------------------------------
+
+    /** Full reset — preserves high score. */
+    private void initGame() {
+        snake.clear();
+        direction    = Direction.RIGHT;
+        bufferedDir  = Direction.RIGHT;
+        score        = 0;
+        state        = GameState.WAITING;
+
+        // Build initial snake (5 segments) near centre
+        int startX = COLS / 2;
+        int startY = ROWS / 2;
+        for (int i = 0; i < 5; i++) {
+            snake.add(new Point(startX - i, startY));
         }
-        
-        newApple();
-        running = true;
-        timer = new Timer(DELAY, this);
+
+        spawnApple();
+
+        if (timer != null) timer.stop();
+        timer = new Timer(BASE_DELAY, this);
+        repaint();
+    }
+
+    /** Begin ticking (called on first key press or after restart). */
+    private void startRunning() {
+        state = GameState.RUNNING;
         timer.start();
     }
 
-    /**
-     * Overrides the paintComponent method to draw the game graphics.
-     * @param g The Graphics object to protect
-     */
-    public void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        draw(g);
-    }
-
-    /**
-     * Draws all the game elements.
-     * @param g The Graphics object for drawing
-     */
-    public void draw(Graphics g) {
-        if (running) {
-            // Draw the apple
-            g.setColor(Color.red);
-            g.fillOval(appleX, appleY, UNIT_SIZE, UNIT_SIZE);
-
-            // Draw the snake
-            for (int i = 0; i < bodyParts; i++) {
-                if (i == 0) { // The head of the snake
-                    g.setColor(Color.green);
-                    g.fillRect(x[i], y[i], UNIT_SIZE, UNIT_SIZE);
-                } else { // The body of the snake
-                    g.setColor(new Color(45, 180, 0));
-                    g.fillRect(x[i], y[i], UNIT_SIZE, UNIT_SIZE);
-                }
-            }
-            // Draw the score
-            g.setColor(Color.white);
-            g.setFont(new Font("Ink Free", Font.BOLD, 40));
-            FontMetrics metrics = getFontMetrics(g.getFont());
-            g.drawString("Score: " + applesEaten, (SCREEN_WIDTH - metrics.stringWidth("Score: " + applesEaten)) / 2, g.getFont().getSize());
-
-        } else {
-            gameOver(g);
-        }
-    }
-
-    /**
-     * Generates coordinates for a new apple, ensuring it doesn't spawn on the snake.
-     */
-    public void newApple() {
-        boolean onSnake;
-        do {
-            onSnake = false;
-            appleX = random.nextInt((int)(SCREEN_WIDTH / UNIT_SIZE)) * UNIT_SIZE;
-            appleY = random.nextInt((int)(SCREEN_HEIGHT / UNIT_SIZE)) * UNIT_SIZE;
-            // Check if the new apple position is on the snake
-            for (int i = 0; i < bodyParts; i++) {
-                if (appleX == x[i] && appleY == y[i]) {
-                    onSnake = true;
-                    break;
-                }
-            }
-        } while (onSnake);
-    }
-
-    /**
-     * Moves the snake by updating its coordinates.
-     */
-    public void move() {
-        // Shift the body parts of the snake
-        for (int i = bodyParts; i > 0; i--) {
-            x[i] = x[i - 1];
-            y[i] = y[i - 1];
-        }
-
-        // Move the head of the snake based on the current direction
-        switch (direction) {
-            case 'U':
-                y[0] = y[0] - UNIT_SIZE;
-                break;
-            case 'D':
-                y[0] = y[0] + UNIT_SIZE;
-                break;
-            case 'L':
-                x[0] = x[0] - UNIT_SIZE;
-                break;
-            case 'R':
-                x[0] = x[0] + UNIT_SIZE;
-                break;
-        }
-    }
-
-    /**
-     * Checks if the snake has eaten the apple.
-     */
-    public void checkApple() {
-        if ((x[0] == appleX) && (y[0] == appleY)) {
-            bodyParts++;
-            applesEaten++;
-            newApple();
-        }
-    }
-
-    /**
-     * Checks for collisions with the walls or the snake's own body.
-     */
-    public void checkCollisions() {
-        // Check if head collides with body
-        for (int i = bodyParts; i > 0; i--) {
-            if ((x[0] == x[i]) && (y[0] == y[i])) {
-                running = false;
-            }
-        }
-        // Check if head touches left border
-        if (x[0] < 0) {
-            running = false;
-        }
-        // Check if head touches right border
-        if (x[0] >= SCREEN_WIDTH) {
-            running = false;
-        }
-        // Check if head touches top border
-        if (y[0] < 0) {
-            running = false;
-        }
-        // Check if head touches bottom border
-        if (y[0] >= SCREEN_HEIGHT) {
-            running = false;
-        }
-
-        if (!running) {
+    private void togglePause() {
+        if (state == GameState.RUNNING) {
+            state = GameState.PAUSED;
             timer.stop();
-        }
-    }
-
-    /**
-     * Displays the "Game Over" screen.
-     * @param g The Graphics object for drawing
-     */
-    public void gameOver(Graphics g) {
-        // Display Final Score
-        g.setColor(Color.red);
-        g.setFont(new Font("Ink Free", Font.BOLD, 40));
-        FontMetrics metrics1 = getFontMetrics(g.getFont());
-        g.drawString("Score: " + applesEaten, (SCREEN_WIDTH - metrics1.stringWidth("Score: " + applesEaten)) / 2, g.getFont().getSize());
-        
-        // Game Over text
-        g.setColor(Color.red);
-        g.setFont(new Font("Ink Free", Font.BOLD, 75));
-        FontMetrics metrics2 = getFontMetrics(g.getFont());
-        g.drawString("Game Over", (SCREEN_WIDTH - metrics2.stringWidth("Game Over")) / 2, SCREEN_HEIGHT / 2);
-
-        // Restart Message
-        g.setColor(Color.white);
-        g.setFont(new Font("Ink Free", Font.BOLD, 30));
-        FontMetrics metrics3 = getFontMetrics(g.getFont());
-        g.drawString("Press R to Restart", (SCREEN_WIDTH - metrics3.stringWidth("Press R to Restart")) / 2, SCREEN_HEIGHT / 2 + 50);
-    }
-
-    /**
-     * This method is called by the Timer on each tick.
-     * @param e the event to be processed
-     */
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        if (running) {
-            move();
-            checkApple();
-            checkCollisions();
+        } else if (state == GameState.PAUSED) {
+            state = GameState.RUNNING;
+            timer.start();
         }
         repaint();
     }
 
-    /**
-     * Inner class to handle keyboard input.
-     */
-    public class MyKeyAdapter extends KeyAdapter {
+    private void endGame() {
+        state = GameState.GAME_OVER;
+        timer.stop();
+        if (score > highScore) highScore = score;
+        repaint();
+    }
+
+    // -------------------------------------------------------------------------
+    // Core game loop (called by Timer)
+    // -------------------------------------------------------------------------
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        if (state != GameState.RUNNING) return;
+
+        // Apply buffered direction (prevents reversing due to rapid key presses)
+        direction = bufferedDir;
+
+        move();
+        checkApple();
+        checkCollisions();
+        repaint();
+    }
+
+    private void move() {
+        Point head = snake.get(0);
+        Point newHead = switch (direction) {
+            case UP    -> new Point(head.x,     head.y - 1);
+            case DOWN  -> new Point(head.x,     head.y + 1);
+            case LEFT  -> new Point(head.x - 1, head.y);
+            case RIGHT -> new Point(head.x + 1, head.y);
+        };
+        snake.add(0, newHead);
+        snake.remove(snake.size() - 1); // remove tail (re-added in checkApple if eaten)
+    }
+
+    private void checkApple() {
+        if (snake.get(0).equals(apple)) {
+            score++;
+            // Grow snake by re-inserting a tail copy
+            snake.add(new Point(snake.get(snake.size() - 1).x, snake.get(snake.size() - 1).y));
+            spawnApple();
+            updateSpeed();
+        }
+    }
+
+    private void checkCollisions() {
+        Point head = snake.get(0);
+
+        // Wall collision
+        if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+            endGame();
+            return;
+        }
+
+        // Self collision — start from index 1 (skip head itself)
+        for (int i = 1; i < snake.size(); i++) {
+            if (head.equals(snake.get(i))) {
+                endGame();
+                return;
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private void spawnApple() {
+        Point candidate;
+        do {
+            candidate = new Point(random.nextInt(COLS), random.nextInt(ROWS));
+        } while (snake.contains(candidate));
+        apple = candidate;
+    }
+
+    private void updateSpeed() {
+        int level = score / APPLES_PER_LEVEL;
+        int newDelay = Math.max(MIN_DELAY, BASE_DELAY - level * SPEED_STEP);
+        timer.setDelay(newDelay);
+    }
+
+    private int currentLevel() {
+        return score / APPLES_PER_LEVEL + 1;
+    }
+
+    // -------------------------------------------------------------------------
+    // Rendering
+    // -------------------------------------------------------------------------
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+        drawGrid(g2);
+        drawApple(g2);
+        drawSnake(g2);
+        drawHUD(g2);
+
+        if (state == GameState.WAITING)   drawWaitingOverlay(g2);
+        if (state == GameState.PAUSED)    drawPausedOverlay(g2);
+        if (state == GameState.GAME_OVER) drawGameOverOverlay(g2);
+    }
+
+    private void drawGrid(Graphics2D g2) {
+        g2.setColor(COL_GRID);
+        g2.setStroke(new BasicStroke(0.5f));
+        for (int x = 0; x <= COLS; x++) g2.drawLine(x * UNIT, 0, x * UNIT, SCREEN_H);
+        for (int y = 0; y <= ROWS; y++) g2.drawLine(0, y * UNIT, SCREEN_W, y * UNIT);
+    }
+
+    private void drawApple(Graphics2D g2) {
+        int ax = apple.x * UNIT;
+        int ay = apple.y * UNIT;
+        int pad = 2;
+        g2.setColor(COL_APPLE);
+        g2.fillOval(ax + pad, ay + pad, UNIT - pad * 2, UNIT - pad * 2);
+        // Stem
+        g2.setColor(COL_APPLE_STEM);
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawLine(ax + UNIT / 2, ay + pad, ax + UNIT / 2 + 3, ay - 2);
+    }
+
+    private void drawSnake(Graphics2D g2) {
+        int size = snake.size();
+        for (int i = size - 1; i >= 0; i--) {
+            Point seg = snake.get(i);
+            int px = seg.x * UNIT + 1;
+            int py = seg.y * UNIT + 1;
+            int dim = UNIT - 2;
+            int arc = 6;
+
+            if (i == 0) {
+                g2.setColor(COL_HEAD);
+            } else {
+                // Gradient from bright to dark along the body
+                float t = (float) i / size;
+                g2.setColor(blend(COL_BODY_LIGHT, COL_BODY_DARK, t));
+            }
+
+            g2.fill(new RoundRectangle2D.Float(px, py, dim, dim, arc, arc));
+
+            // Draw eyes on the head
+            if (i == 0) drawEyes(g2, seg);
+        }
+    }
+
+    private void drawEyes(Graphics2D g2, Point head) {
+        g2.setColor(COL_BG);
+        int cx = head.x * UNIT + UNIT / 2;
+        int cy = head.y * UNIT + UNIT / 2;
+        int eyeR = 2;
+        int offset = 4;
+
+        int ex1, ey1, ex2, ey2;
+        switch (direction) {
+            case UP    -> { ex1 = cx - offset; ey1 = cy - offset; ex2 = cx + offset; ey2 = cy - offset; }
+            case DOWN  -> { ex1 = cx - offset; ey1 = cy + offset; ex2 = cx + offset; ey2 = cy + offset; }
+            case LEFT  -> { ex1 = cx - offset; ey1 = cy - offset; ex2 = cx - offset; ey2 = cy + offset; }
+            default    -> { ex1 = cx + offset; ey1 = cy - offset; ex2 = cx + offset; ey2 = cy + offset; }
+        }
+        g2.fillOval(ex1 - eyeR, ey1 - eyeR, eyeR * 2, eyeR * 2);
+        g2.fillOval(ex2 - eyeR, ey2 - eyeR, eyeR * 2, eyeR * 2);
+    }
+
+    private void drawHUD(Graphics2D g2) {
+        g2.setColor(COL_HUD);
+        g2.setFont(new Font("Monospaced", Font.BOLD, 14));
+        g2.drawString("SCORE: " + score, 8, 18);
+        g2.drawString("BEST: " + highScore, 8, 36);
+
+        String lvl = "LVL " + currentLevel();
+        FontMetrics fm = g2.getFontMetrics();
+        g2.drawString(lvl, SCREEN_W - fm.stringWidth(lvl) - 8, 18);
+    }
+
+    private void drawWaitingOverlay(Graphics2D g2) {
+        drawDimOverlay(g2);
+        drawCentredText(g2, "SNAKE", new Font("Monospaced", Font.BOLD, 52), COL_HEAD, -40);
+        drawCentredText(g2, "Press any arrow key to start", new Font("Monospaced", Font.PLAIN, 16), Color.WHITE, 20);
+    }
+
+    private void drawPausedOverlay(Graphics2D g2) {
+        drawDimOverlay(g2);
+        drawCentredText(g2, "PAUSED", new Font("Monospaced", Font.BOLD, 48), COL_HEAD, 0);
+        drawCentredText(g2, "Press P to resume", new Font("Monospaced", Font.PLAIN, 16), Color.WHITE, 40);
+    }
+
+    private void drawGameOverOverlay(Graphics2D g2) {
+        drawDimOverlay(g2);
+        drawCentredText(g2, "GAME OVER", new Font("Monospaced", Font.BOLD, 44), new Color(220, 80, 80), -50);
+        drawCentredText(g2, "Score: " + score + "   Best: " + highScore, new Font("Monospaced", Font.BOLD, 18), COL_HUD, 10);
+        drawCentredText(g2, "Press R to restart", new Font("Monospaced", Font.PLAIN, 16), Color.WHITE, 45);
+    }
+
+    private void drawDimOverlay(Graphics2D g2) {
+        g2.setColor(COL_OVERLAY_BG);
+        g2.fillRect(0, 0, SCREEN_W, SCREEN_H);
+    }
+
+    private void drawCentredText(Graphics2D g2, String text, Font font, Color color, int yOffset) {
+        g2.setFont(font);
+        g2.setColor(color);
+        FontMetrics fm = g2.getFontMetrics();
+        int x = (SCREEN_W - fm.stringWidth(text)) / 2;
+        int y = SCREEN_H / 2 + yOffset;
+        g2.drawString(text, x, y);
+    }
+
+    /** Linear interpolation between two colours. t=0 → a, t=1 → b. */
+    private Color blend(Color a, Color b, float t) {
+        t = Math.max(0, Math.min(1, t));
+        return new Color(
+            (int) (a.getRed()   + t * (b.getRed()   - a.getRed())),
+            (int) (a.getGreen() + t * (b.getGreen() - a.getGreen())),
+            (int) (a.getBlue()  + t * (b.getBlue()  - a.getBlue()))
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Input
+    // -------------------------------------------------------------------------
+
+    private class MyKeyAdapter extends KeyAdapter {
         @Override
         public void keyPressed(KeyEvent e) {
-            if (running) {
-                switch (e.getKeyCode()) {
-                    case KeyEvent.VK_LEFT:
-                        if (direction != 'R') { // Prevent the snake from reversing
-                            direction = 'L';
-                        }
-                        break;
-                    case KeyEvent.VK_RIGHT:
-                        if (direction != 'L') {
-                            direction = 'R';
-                        }
-                        break;
-                    case KeyEvent.VK_UP:
-                        if (direction != 'D') {
-                            direction = 'U';
-                        }
-                        break;
-                    case KeyEvent.VK_DOWN:
-                        if (direction != 'U') {
-                            direction = 'D';
-                        }
-                        break;
+            switch (e.getKeyCode()) {
+
+                case KeyEvent.VK_LEFT  -> requestDirection(Direction.LEFT);
+                case KeyEvent.VK_RIGHT -> requestDirection(Direction.RIGHT);
+                case KeyEvent.VK_UP    -> requestDirection(Direction.UP);
+                case KeyEvent.VK_DOWN  -> requestDirection(Direction.DOWN);
+
+                case KeyEvent.VK_P -> {
+                    if (state == GameState.RUNNING || state == GameState.PAUSED)
+                        togglePause();
                 }
-            } else {
-                // If the game is over, check for the restart key
-                if (e.getKeyCode() == KeyEvent.VK_R) {
-                    startGame();
+                case KeyEvent.VK_R -> {
+                    if (state == GameState.GAME_OVER || state == GameState.WAITING)
+                        initGame();
+                    else {
+                        // Allow mid-game restart
+                        initGame();
+                    }
                 }
+            }
+        }
+
+        private void requestDirection(Direction d) {
+            if (state == GameState.WAITING) {
+                bufferedDir = d;
+                startRunning();
+            } else if (state == GameState.RUNNING && !d.isOpposite(direction)) {
+                bufferedDir = d;
             }
         }
     }
