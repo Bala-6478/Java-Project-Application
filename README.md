@@ -17,7 +17,7 @@ Java (.java):
 
 * MY JDK Version is Jdk23 (javac 23.0.2)
 --------
-### Java-Project-Application  
+### Java-Project-Applications 
 1. Password Generator GUI In Java   
 2. Add Vote GUI Cheaker in Java   
 3. Password instroction giver using GUI  
