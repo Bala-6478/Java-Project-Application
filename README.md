@@ -18,7 +18,7 @@ Java (.java):
 --------
 ### Developed by :-
 
-This all are developed by BEST_TEAM...
+* This all are developed by BEST_TEAM...
 -----
 ### Java-Project-Applications 
 1. Password Generator GUI In Java   
