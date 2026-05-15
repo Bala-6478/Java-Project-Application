@@ -52,7 +52,7 @@ Java (.java):
 29. QuizGame In Java
 30. BillSplitterTool  In Java
 31. GradeCalculator In Java
-32. 
+32. MadLibsGenerator In Java
   
       
   
