@@ -5,7 +5,7 @@
 ## Run the Code 
   
 The command to run the code depends on the programming language or file type of the project: 
-Java (.java):
+* Java (.java):
 ### Compile it: 
 * javac filename.java
 * java filenmae.java
