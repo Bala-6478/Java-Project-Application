@@ -23,7 +23,7 @@ The command to run the code depends on the programming language or file type of 
 ### Java-Project-Applications 
 1. Password Generator GUI In Java   
 2. Add Vote GUI Cheaker in Java   
-3. Password instroction giver using GUI  
+3. Password instroction giver using GUI  In Java
 4. Library GUI In Java  
 5. Zip Utility GUI In Java    
 6. InterestCalculator GUI In Java
@@ -53,7 +53,7 @@ The command to run the code depends on the programming language or file type of 
 30. BillSplitterTool  In Java
 31. GradeCalculator In Java
 32. MadLibsGenerator In Java
-33. UnitConverterTool In Java
+33. UnitConverterTool In Java  
   
       
   
