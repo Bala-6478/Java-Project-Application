@@ -47,8 +47,8 @@ The command to run the code depends on the programming language or file type of 
 24. NumberGuessing Game GUI In Java
 25. TypingSpeedTesterAdvanced GUI In Java
 26. PalindromeChecker GUI In Java
-27. EmailConverterGUI In Java
-28. NumberToWordsGUI In Java  
+27. EmailConverter GUI In Java
+28. NumberToWords GUI In Java  
 29. QuizGame In Java
 30. BillSplitterTool  In Java
 31. GradeCalculator In Java
