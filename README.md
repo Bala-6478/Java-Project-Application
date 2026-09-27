@@ -7,7 +7,7 @@
 The command to run the code depends on the programming language or file type of the project:  
 * Java (.java): 
 ### Compile it : 
-* javac filename.java
+* javac filename.java  
 * java filenmae.java   
 --------   
 ### JDK Version Check  :
